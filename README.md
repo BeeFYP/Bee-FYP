@@ -1,3 +1,1 @@
 # Bee-FYP
-
-print("Hello")
