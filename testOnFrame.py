@@ -154,6 +154,7 @@ for w in range(1, 80):
 
     # dilate the thresholded image to fill in holes, then find contours
     # on thresholded image
+    thresh_og = cv2.dilate(thresh, None, iterations=2)
     thresh = cv2.dilate(thresh2, None, iterations=2)
     cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
                             cv2.CHAIN_APPROX_SIMPLE)
@@ -163,10 +164,10 @@ for w in range(1, 80):
     height = adaptiveFrame.shape[0]
     width = adaptiveFrame.shape[1]
 
-    learning_rate = 0.04
+    learning_rate = 0.05
 
-    if z % 10 == 0:
-        #print("Updating the reference")
+    if z % 5 == 0:
+        print("Updating the reference")
         for i in range(height-1):
             for j in range(width-1):
                 #Change the value of the pixel based on a the simple adapative background
@@ -237,7 +238,7 @@ for w in range(1, 80):
             #we should now operate on that detected pixel
             #define a global index
             index = -999
-            threshold = 20 #in pixels
+            threshold = 30 #in pixels
             #look if the global bee dictionary is empty
             if frame_num ==0:
                 #generate new instances directly
@@ -300,13 +301,7 @@ for w in range(1, 80):
 
 
 
-    # show the frame and record if the user presses a key
-    cv2.imshow("Entrance Feed", frame)
-    cv2.imshow("Thresh", thresh)
-    cv2.imshow("Frame Delta", frameDelta)
-    cv2.imshow("ref",firstFrame)
-    cv2.waitKey(400)
-    key = cv2.waitKey(1) & 0xFF
+
 
     # if the `q` key is pressed, break from the loop
     if key == ord("q"):
@@ -331,23 +326,28 @@ for w in range(1, 80):
     shape = frame.shape
     ylow = 0
     yhigh = shape[0]
-    boundary_thresh = 0.12*(yhigh-ylow) #within 12 percent of the edges
-    max_misses = 0
+    boundary_thresh = 0.15*(yhigh-ylow) #within 12 percent of the edges
+    #print("boundary tresh", boundary_thresh)
+    max_misses = 7
     #print("ylow is", ylow)
     #print("yhigh is", yhigh)
     #print(counting)
     counting = counting + 1
     for k in status:
             if (status["{}".format(k)] == "absent"):
+                    print("lost one bee")
                 #might want to add a condition that the last coordinates be next to the edges
                  #can't predict the flow if it only appears in a single frame
                     #look at the last pair of coordinates
                     x2 = bee["{}".format(k)][-1][0]
                     y2 = bee["{}".format(k)][-1][1]
+                    #print("y2 is", y2)
                     #look at the y coordinates, if they are next to the borders continue
                     #else this is a missing bee we should be flexible and wait for the next frame
                     if abs(y2 - ylow) < boundary_thresh or abs(y2 - yhigh) < boundary_thresh:
+                        #print("within the applied boundaries")
                         if (len(bee["{}".format(k)]) >= 2): #It has two points at least and is within the boundary
+                            #print("it has atleast two coordinates")
                             x1 = bee["{}".format(k)][-2][0]
                             y1 = bee["{}".format(k)][-2][1]
                             #look at the difference between the y components to assess if in or out
@@ -363,6 +363,7 @@ for w in range(1, 80):
                         else: #Only have a single value but within boundary. Assume it missing might find it later on
                             #print("Absent and has a single coordinate, allow for a miss !")
                             # pop.append(k) #might want to keep the lost bee for other frames
+                            print(k, "has only one coordinate and is added to the potential misses")
                             if k in to_pop:  # if the bee is already present
                                 # update the counter
                                 to_pop["{}".format(k)] += 1
@@ -372,6 +373,7 @@ for w in range(1, 80):
                                 #print("Adding", k, "to the to_pop list for the first time")
 
                     else: #If it is not within the boundaries it must be missing
+                        print(k, "not within the boundaries must be added to the missing")
                         #print("Absent but not within the boundaries, allow for a miss !")
                         #pop.append(k) #might want to keep the lost bee for other frames
                         if k in to_pop: #if the bee is already present
@@ -385,13 +387,13 @@ for w in range(1, 80):
 
     for p, cnt in to_pop.items():
         if cnt >= max_misses:
-            #print(p, "has been missing for", cnt," long time, removing the object's ID from the logfile")
+            print(p, "has been missing for", cnt," long time, removing the object's ID from the logfile")
             pop.append(p)
             to_pop.pop("{}".format(p)) #move it to pop
 
-    #print("bee", bee)
-    #print("pop", pop)
-    #print("status",status)
+    print("bee", bee)
+    print("pop", pop)
+    print("status",status)
     #remove this object from the list
     for q in pop:
         #if the ID is present in pop it has to be removed from the logs such as colors, bee and status
@@ -404,6 +406,14 @@ for w in range(1, 80):
     for k in bee:
         status["{}".format(k)] = "absent"
 
+    # show the frame and record if the user presses a key
+    cv2.imshow("Entrance Feed", frame)
+    cv2.imshow("Thresh", thresh)
+    cv2.imshow("Thresh_OG", thresh_og)
+    cv2.imshow("Frame Delta", frameDelta)
+    cv2.imshow("ref",firstFrame)
+    cv2.waitKey(2000)
+    key = cv2.waitKey(1) & 0xFF
 
     print("the net flow is {}".format(flow))
     frame_num += 1
